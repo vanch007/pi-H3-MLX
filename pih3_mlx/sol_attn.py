@@ -217,6 +217,7 @@ _kernel = mx.fast.metal_kernel(
     header=_HEADER,
 )
 BQ, BK = 32, 16
+DENSITY_LOG = None  # set to a list to collect each call's fraction of exact blocks (mx scalars)
 
 
 def _block_sums(x, T, N):
@@ -287,6 +288,8 @@ def sol_attention(q, k, v, prefix: int = 0, tau: float = 1.0, scale: float | Non
         dense = mx.fast.scaled_dot_product_attention(qt, kt, vt, scale=scale)[0].transpose(1, 0, 2)
         out = mx.concatenate([dense, out[prefix:]])
     out = out[None]
+    if DENSITY_LOG is not None:
+        DENSITY_LOG.append(exact.astype(mx.float32).mean())
     if return_density:
         return out, exact.astype(mx.float32).mean()
     return out

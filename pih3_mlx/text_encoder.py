@@ -39,6 +39,8 @@ __all__ = [
     "build_model",
     "sanitize",
     "load_text_encoder",
+    "save_text_encoder",
+    "load_converted_text_encoder",
     "build_presentation",
     "get_rope_index",
     "encode_tokens",
@@ -218,6 +220,48 @@ def load_text_encoder(
     tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_dir))
     image_processor = AutoImageProcessor.from_pretrained(str(processor_dir)) if processor_dir else None
     return make_encoder(config, weights, tokenizer, image_processor, dtype, quantize_bits, layer)
+
+
+SHARD_BYTES = 4 << 30
+
+
+def save_text_encoder(encoder: H3TextEncoder, out_dir, quantize_bits: int | None):
+    """Save the built (optionally quantized) encoder as MLX safetensors shards + config, for `load_converted_*`."""
+    from mlx.utils import tree_flatten
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cfg = dict(encoder.config, h3_layer=encoder.layer,
+               mlx_quantization=dict(bits=quantize_bits, group_size=64) if quantize_bits else None)
+    (out_dir / "config.json").write_text(json.dumps(cfg, indent=2))
+    shard, size, idx = {}, 0, 0
+    items = tree_flatten(encoder.model.parameters())
+    for i, (k, v) in enumerate(items):
+        shard[k] = v
+        size += v.nbytes
+        if size >= SHARD_BYTES or i == len(items) - 1:
+            mx.save_safetensors(str(out_dir / f"model-{idx:05d}.safetensors"), shard)
+            shard, size, idx = {}, 0, idx + 1
+
+
+def load_converted_text_encoder(model_dir, tokenizer_dir, processor_dir, dtype=mx.bfloat16) -> H3TextEncoder:
+    """Load an encoder written by `save_text_encoder` (already quantized: no bf16 detour, ~half the peak memory)."""
+    from transformers import AutoImageProcessor, AutoTokenizer
+
+    model_dir = Path(model_dir)
+    config = json.loads((model_dir / "config.json").read_text())
+    layer, q = config.pop("h3_layer"), config.pop("mlx_quantization")
+    model = build_model(config, layer)
+    if q:
+        for blk in model.language_model.model.layers:
+            nn.quantize(blk, group_size=q["group_size"], bits=q["bits"], class_predicate=_quantize_predicate)
+    for f in sorted(model_dir.glob("model-*.safetensors")):
+        model.load_weights(list(mx.load(str(f)).items()), strict=False)
+        mx.eval(model.language_model.parameters())  # the vision tower stays lazy until an image is encoded
+    tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_dir))
+    image_processor = AutoImageProcessor.from_pretrained(str(processor_dir)) if processor_dir else None
+    ids = {name: tokenizer.convert_tokens_to_ids(name) for name in ("<|vision_start|>", "<|image_pad|>", "<|vision_end|>")}
+    return H3TextEncoder(model, tokenizer, image_processor, config, layer, dtype, ids)
 
 
 # --------------------------------------------------------------------------------------------------------------------

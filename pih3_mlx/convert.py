@@ -71,9 +71,31 @@ def load_converted(model_dir: str):
     return model, head, cfg
 
 
+def text_encoder_dir(bits: int | None = 8) -> str:
+    return os.path.join(ROOT, "models_mlx", f"text_encoder_q{bits}" if bits else "text_encoder_bf16")
+
+
+def convert_text_encoder(bits: int | None = 8):
+    """Pre-quantize the Qwen3-VL conditioner once, so generation loads ~34 GB of 8-bit weights instead of reading
+    ~64 GB of bf16 and quantizing on every run."""
+    from .text_encoder import load_text_encoder, save_text_encoder
+
+    t0 = time.time()
+    enc = load_text_encoder(os.path.join(MODELS, "MiniMax-H3-Pruned", "text_encoder"),
+                            os.path.join(MODELS, "MiniMax-H3", "tokenizer"),
+                            os.path.join(MODELS, "MiniMax-H3", "processor"), quantize_bits=bits)
+    save_text_encoder(enc, text_encoder_dir(bits), bits)
+    print(f"saved {text_encoder_dir(bits)} in {time.time() - t0:.0f}s")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--steps", type=int, default=4, choices=(2, 4))
     ap.add_argument("--bits", type=int, default=None, choices=(4, 8))
+    ap.add_argument("--text-encoder", action="store_true",
+                    help="convert the text encoder instead (--bits defaults to 8 here; 0 keeps bf16)")
     a = ap.parse_args()
-    convert(a.steps, a.bits)
+    if a.text_encoder:
+        convert_text_encoder(8 if a.bits is None else (a.bits or None))
+    else:
+        convert(a.steps, a.bits)
