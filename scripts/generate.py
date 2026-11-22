@@ -25,13 +25,15 @@ ap.add_argument("--steps", type=int, default=4, choices=(2, 4))
 ap.add_argument("--seed", type=int, default=42)
 ap.add_argument("--transformer-bits", type=int, choices=(4, 8))
 ap.add_argument("--text-encoder-bits", type=int, default=8, choices=(0, 4, 8))
+ap.add_argument("--dense-attention", action="store_true", help="disable Sol sparse attention (slower, exact)")
 ap.add_argument("--out", default="outputs/pih3.mp4")
 a = ap.parse_args()
 
 res = generate(a.prompt, image=Image.open(a.image) if a.image else None,
                last_image=Image.open(a.last_image) if a.last_image else None, height=a.height, width=a.width,
                num_frames=a.frames, steps=a.steps, seed=a.seed, transformer_bits=a.transformer_bits,
-               text_encoder_bits=a.text_encoder_bits or None)
+               text_encoder_bits=a.text_encoder_bits or None,
+               sparse_attention=not a.dense_attention)
 os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
 save_mp4(res, a.out)
 print("wrote", a.out)

@@ -56,7 +56,7 @@ class Result:
 
 def generate(prompt: str, image=None, last_image=None, height=None, width=None, num_frames: int = 121,
              steps: int = 4, seed: int = 42, transformer_bits: int | None = None, text_encoder_bits: int | None = 8,
-             models_dir: str = MODELS) -> Result:
+             sparse_attention: bool = True, models_dir: str = MODELS) -> Result:
     timings, t_all = {}, time.time()
 
     # 1. keyframes and canvas
@@ -110,6 +110,7 @@ def generate(prompt: str, image=None, last_image=None, height=None, width=None, 
     t = time.time()
     model, head, cfg = load_converted(mlx_model_dir(steps, transformer_bits))
     timings["load_transformer"] = time.time() - t
+    model.sparse_attention = sparse_attention
     dtype = model.context_embedder.weight.dtype  # never quantized
     rope = model.rope_tables(lay.position_ids, dtype)
     text_hidden = model.encode_text(prompt_embeds.astype(dtype))

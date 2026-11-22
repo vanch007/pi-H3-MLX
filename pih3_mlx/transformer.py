@@ -17,9 +17,11 @@ import mlx.nn as nn
 import numpy as np
 
 from .layout import MODALITY_NUM, Layout, adaln_runs
+from .sol_attn import sol_attention
 
 FP32_KEYS = ("time_table", "norm_out.", "dwd_norm_out.", "proj_in.", "audio_proj_in.", "proj_out.", "audio_proj_out.")
 SEQ_CHUNK = 16384
+SOL_FIRST_BLOCK = 2  # upstream runs Sol sparse attention after the first 2 dense blocks
 
 
 class Attention(nn.Module):
@@ -34,7 +36,7 @@ class Attention(nn.Module):
         self.norm_q = nn.RMSNorm(head_dim, eps=eps)
         self.norm_k = nn.RMSNorm(head_dim, eps=eps)
 
-    def __call__(self, x, rope=None):
+    def __call__(self, x, rope=None, sol_prefix=None):
         B, S, _ = x.shape
         shp = (B, S, self.heads, self.head_dim)
         q = mx.fast.rms_norm(self.to_q(x).reshape(shp), self.norm_q.weight, self.eps)
@@ -42,6 +44,8 @@ class Attention(nn.Module):
         v = self.to_v(x).reshape(shp)
         if rope is not None:
             q, k = _apply_rope(q, *rope), _apply_rope(k, *rope)
+        if sol_prefix is not None:  # Sol sparse attention; the prefix rows stay dense
+            return self.to_out(sol_attention(q, k, v, sol_prefix).reshape(B, S, -1))
         o = mx.fast.scaled_dot_product_attention(
             q.transpose(0, 2, 1, 3), k.transpose(0, 2, 1, 3), v.transpose(0, 2, 1, 3), scale=self.head_dim ** -0.5)
         return self.to_out(o.transpose(0, 2, 1, 3).reshape(B, S, -1))
@@ -131,12 +135,12 @@ class TransformerBlock(nn.Module):
         self.ff = FeedForward(hidden, ffn)
         self.adaln_proj = AdaLNProj(rank, 6 * hidden * MODALITY_NUM)
 
-    def __call__(self, x, temb, runs, rope):
+    def __call__(self, x, temb, runs, rope, sol_prefix=None):
         dtype = x.dtype
         mod = self.adaln_proj(temb).astype(dtype).reshape(-1, 6, self.hidden)  # rows: timestep * 3 + modality
         sh_a, sc_a, g_a, sh_m, sc_m, g_m = (mod[:, i] for i in range(6))
         h = _modulate(mx.fast.rms_norm(x, self.norm1.weight, self.eps), runs, sc_a, sh_a)
-        x = _gate(x, self.attn(h, rope), runs, g_a)
+        x = _gate(x, self.attn(h, rope, sol_prefix), runs, g_a)
         mx.eval(x)
         out = []
         for i in range(0, x.shape[1], SEQ_CHUNK):  # the FFN is row-wise; chunk to bound the 2*ffn activation
@@ -172,6 +176,7 @@ class H3Transformer(nn.Module):
     def __init__(self, cfg: dict, with_dwd: bool = True):
         super().__init__()
         self.cfg = cfg
+        self.sparse_attention = True  # Sol attention in blocks >= SOL_FIRST_BLOCK; False = dense everywhere
         D, heads, hd, ffn = cfg["hidden_size"], cfg["num_attention_heads"], cfg["attention_head_dim"], cfg["ffn_dim"]
         rank, eps = cfg["adaln_rank"], cfg["norm_eps"]
         pdim = cfg["in_channels"] * int(np.prod(cfg["patch_size"]))
@@ -226,8 +231,9 @@ class H3Transformer(nn.Module):
         x = mx.concatenate([text_hidden, v[:, :nc], a, v[:, nc:]], axis=1)
         temb = self.time_embed(timesteps)
         runs = adaln_runs(timestep_indices * MODALITY_NUM + layout.token_tags)
-        for blk in self.transformer_blocks:
-            x = blk(x, temb, runs, rope)
+        for i, blk in enumerate(self.transformer_blocks):
+            sol = layout.prefix_len if self.sparse_attention and i >= SOL_FIRST_BLOCK else None
+            x = blk(x, temb, runs, rope, sol)
         a0, v0 = layout.num_text + nc, layout.prefix_len
         xv, xa = x[0, v0:], x[0, a0:v0]
         tv, ta = temb[int(timestep_indices[v0])], temb[int(timestep_indices[a0])]

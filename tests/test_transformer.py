@@ -66,6 +66,7 @@ def test_transformer_parity(anchors):
     want_a = out[1][0].numpy()
 
     model = H3Transformer(CFG, with_dwd=False)
+    model.sparse_attention = False  # parity vs the dense reference; Sol is covered by test_sol_attn.py
     w = sanitize({k: mx.array(v.detach().numpy()) for k, v in ref.state_dict().items()}, dtype=mx.float32)
     model.load_weights(list(w.items()), strict=True)
     rope = model.rope_tables(lay.position_ids, mx.float32)

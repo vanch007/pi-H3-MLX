@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import mlx.core as mx, mlx.nn as nn, numpy as np
 from pih3_mlx.transformer import TransformerBlock, quantize
 
-def bench(S, bits=None, reps=3):
+def bench(S, bits=None, reps=3, sol=None):
     blk = TransformerBlock(5376, 56, 128, 14336, 8, 1e-5)
     blk.update(nn.utils.tree_map(lambda p: (mx.random.normal(p.shape) * 0.02).astype(mx.bfloat16), blk.parameters()))
     if bits:
@@ -15,15 +15,15 @@ def bench(S, bits=None, reps=3):
     runs = [(0, 1200, 4), (1200, S, 0)]
     cos = mx.random.normal((1, S, 1, 96)).astype(mx.bfloat16); sin = cos
     mx.eval(x, temb, cos)
-    blk(x, temb, runs, (cos, sin)); mx.eval(x)
+    mx.eval(blk(x, temb, runs, (cos, sin), sol))
     ts = []
     for _ in range(reps):
-        t = time.time(); y = blk(x, temb, runs, (cos, sin)); mx.eval(y); ts.append(time.time() - t)
+        t = time.time(); y = blk(x, temb, runs, (cos, sin), sol); mx.eval(y); ts.append(time.time() - t)
     flops = 2 * S * 5376 * (4 * 7168 + 3 * 14336) + 4 * S * S * 7168
     dt = min(ts)
-    print(f"S={S:6d} bits={bits}: {dt*1000:8.1f} ms/block  {flops/dt/1e12:5.1f} TFLOPS  -> 50 blocks/step {dt*50:6.1f}s  peak {mx.get_peak_memory()/1e9:.1f}GB", flush=True)
+    print(f"S={S:6d} bits={bits} {'sol' if sol is not None else 'dense'}: {dt*1000:8.1f} ms/block  {flops/dt/1e12:5.1f} TFLOPS  -> 50 blocks/step {dt*50:6.1f}s  peak {mx.get_peak_memory()/1e9:.1f}GB", flush=True)
     mx.reset_peak_memory()
 
 for S in (17000, 40000, 73500):
     bench(S)
-bench(17000, 8)
+    bench(S, sol=1200)  # Sol sparse attention, 1200 prefix rows (random inputs: ~18-23% exact blocks)
