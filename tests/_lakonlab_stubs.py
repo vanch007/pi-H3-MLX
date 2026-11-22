@@ -1,6 +1,7 @@
 """Import selected LakonLab reference modules without its heavy deps (mmcv, CUDA ops, runner)."""
 
 import importlib.util
+import os
 import sys
 import types
 from pathlib import Path
@@ -8,7 +9,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-LAKONLAB = Path("/Volumes/1T ssd/pi-h3-mlx/LakonLab/lakonlab")
+LAKONLAB = Path(os.environ.get("PIH3_ROOT") or Path(__file__).resolve().parents[2]) / "LakonLab" / "lakonlab"
 
 
 def _swiglu_linear(linear, x, gate_first=True):

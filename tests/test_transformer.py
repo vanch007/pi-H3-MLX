@@ -1,6 +1,7 @@
 """fp32 parity of the MLX H3 transformer against the pruned diffusers reference on a tiny random config."""
 
 import importlib.util
+import os
 import sys
 
 import mlx.core as mx
@@ -9,9 +10,10 @@ import pytest
 import torch
 
 from pih3_mlx import layout as L
+from pih3_mlx.convert import ROOT
 from pih3_mlx.transformer import H3Transformer, sanitize
 
-REF = "/Volumes/1T ssd/pi-h3-mlx/models/MiniMax-H3-Pruned/transformer/modeling_minimax_h3_pruned.py"
+REF = os.path.join(ROOT, "models", "MiniMax-H3-Pruned", "transformer", "modeling_minimax_h3_pruned.py")
 CFG = dict(num_attention_heads=4, attention_head_dim=32, hidden_size=64, num_layers=3, num_refiner_layers=2,
            ffn_dim=96, in_channels=4, audio_in_channels=8, patch_size=[1, 2, 2], text_dim=48, rope_freq_dim=4,
            rope_theta=10000.0, norm_eps=1e-5, qk_norm_eps=1e-5, final_norm_eps=1e-5, adaln_rank=8,

@@ -1,0 +1,14 @@
+pi-H3-MLX
+Copyright 2026 vanch007
+
+Apple MLX port of pi-H3 (few-step MiniMax H3 text/image-to-video with audio).
+
+This repository contains code ported from, and modified relative to:
+  - LakonLab (https://github.com/Lakonik/LakonLab), Copyright 2026 Hansheng Chen, Apache License 2.0
+  - Hugging Face diffusers (https://github.com/huggingface/diffusers), Copyright The HuggingFace Team,
+    Apache License 2.0
+  - mlx-vlm (https://github.com/Blaizzy/mlx-vlm), MIT License (Qwen3-VL text encoder model definition, used as a library)
+Every module under pih3_mlx/ names the reference file it was ported from in its docstring.
+
+The model weights used by this code are not part of this repository. They are governed by:
+MiniMax H3 is licensed under the MiniMax H3 Community License Agreement, Copyright © 2026 MiniMax. All Rights Reserved.

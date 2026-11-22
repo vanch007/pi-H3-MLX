@@ -54,10 +54,10 @@ CASES = [
     # image-to-video with people; keyframes generated with Gemini (Nano Banana Pro) in outputs/keyframes, the last
     # frames as edits of the first so identity and scene match
     ("i2v_cafe_5s", CAFE_SAY, None, None, 121, {"image_path": "cafe_first_generated_1.jpg"}),
-    ("i2v_chestnut_portrait_5s", CHESTNUT_SAY, None, None, 121, {"image_path": "chestnut_generated_1.jpg"}),
-    ("i2v_dancer_768_5s", DANCER_DO, 768, 1344, 121, {"image_path": "dancer_generated_1.jpg"}),
-    ("i2v_cafe_10s", CAFE_SAY, None, None, 243, {"image_path": "cafe_first_generated_1.jpg"}),
-    ("flf2v_cafe_5s", CAFE_BYE, None, None, 121,
+    ("i2v_chestnut_896x512_5s", CHESTNUT_SAY, 896, 512, 121, {"image_path": "chestnut_generated_1.jpg"}),
+    ("i2v_dancer_512x896_5s", DANCER_DO, 512, 896, 121, {"image_path": "dancer_generated_1.jpg"}),
+    ("i2v_cafe_512x896_10s", CAFE_SAY, 512, 896, 243, {"image_path": "cafe_first_generated_1.jpg"}),
+    ("flf2v_cafe_512x896_5s", CAFE_BYE, 512, 896, 121,
      {"image_path": "cafe_first_generated_1.jpg", "last_image_path": "cafe_last_generated_1.jpg"}),
     ("flf2v_office_5s", OFFICE_DO, None, None, 121,
      {"image_path": "office_first_generated_1.jpg", "last_image_path": "office_last_generated_1.jpg"}),

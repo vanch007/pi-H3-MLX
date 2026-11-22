@@ -13,7 +13,8 @@ from PIL import Image
 
 from pih3_mlx import text_encoder as te
 
-ROOT = Path("/Volumes/1T ssd/pi-h3-mlx")
+from pih3_mlx.convert import ROOT as _ROOT  # noqa: E402
+ROOT = Path(_ROOT)
 TOKENIZER_DIR = ROOT / "models/MiniMax-H3/tokenizer"
 PROCESSOR_DIR = ROOT / "models/MiniMax-H3/processor"
 TEXT_ENCODER_DIR = ROOT / "models/MiniMax-H3-Pruned/text_encoder"

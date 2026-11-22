@@ -15,7 +15,9 @@ from mlx.utils import tree_flatten
 from . import dwd_head
 from .transformer import H3Transformer, build_transformer, quantize
 
-ROOT = "/Volumes/1T ssd/pi-h3-mlx"
+# Weights root holding `models/` (original HF weights) and `models_mlx/` (converted). Defaults to the folder that
+# contains this repository; set PIH3_ROOT to a `hf download vanch007/pi-H3-MLX --local-dir <dir>` folder instead.
+ROOT = os.environ.get("PIH3_ROOT") or os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODELS = os.path.join(ROOT, "models")
 SHARD_BYTES = 4 << 30
 

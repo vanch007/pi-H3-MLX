@@ -1,0 +1,10 @@
+mlx>=0.32.4
+mlx-vlm>=0.8.0
+transformers>=5.24
+numpy
+pillow
+av
+safetensors
+huggingface_hub
+# optional: bit-identical noise with the PyTorch reference, and the parity tests
+# torch
